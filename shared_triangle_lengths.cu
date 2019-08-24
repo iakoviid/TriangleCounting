@@ -20,20 +20,20 @@
     }                                                                          \
   }
 
-__global__ void findColStart(int *dJ, int nz, int *col) {
+__global__ void findCol_ptr(int *dJ, int nz, int *col) {
   
  for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<nz;i+=gridDim.x*blockDim.x){
      if(i<nz){
-    int a=dJ[i];
-    int b=dJ[i-1];
-    if (a != b) {
-      col[a] = i;
+    int x=dJ[i];
+    int y=dJ[i-1];
+    if (x != y) {
+      col[x] = i;
     
-    if(b+1!=a){
-        col[b + 1] = i;
+    if(y+1!=x){
+        col[y + 1] = i;
     }}
     if(i==nz-1){
-        col[a+1]=nz;
+        col[x+1]=nz;
     }
     if(i==0){
     col[0]=0;
@@ -42,7 +42,7 @@ __global__ void findColStart(int *dJ, int nz, int *col) {
   }
   } 
 }
-__global__ void InitColStart(int len, int *col) {
+__global__ void InitCol_ptr(int len, int *col) {
   for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<len;i+=gridDim.x*blockDim.x){
   if(i<len){
         col[i]=-1;
@@ -72,22 +72,19 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
         }
 
       
-        int j=tid;
-        for(j<len)
+        for(int j=tid;j<len;j+=blockDim.x)
         {   
             if(dJ[j+colStart]==i){
                 blockCol[j]=dI[j+colStart];
                 }
-            j+=blockDim.x;
         }
           __syncthreads();
 
       
-         j=tid;
          int k1;
          int k2;
          int s;
-         while(j<len)
+        for(int j=tid;j<len;j+=blockDim.x)
         {   s=0;
             k1=0;
             int x=blockCol[j];
@@ -95,7 +92,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
             int r1;
             int r2;
             if(k2>0){
-                len2=col[x+1];
+                int len2=col[x+1];
                 r1=blockCol[k1];
                 r2=dI[k2];
                 while(k1<len && k2<len2 ) {
@@ -121,13 +118,12 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
             }
 
             nt[j]=s;
-            j+=blockDim.x;
         }
         __syncthreads();
-        j=tid+blockDim.x;
-        while(j<len){
+        
+        for(int j=tid+blockDim.x;j<len;j+=blockDim.x){
         nt[tid]=nt[tid]+nt[j];
-        j+=blockDim.x;
+        
         }
         __syncthreads();
 
@@ -203,8 +199,8 @@ int main(int argc, char *argv[])
 
     if (f !=stdin) fclose(f);
 
-    mm_write_banner(stdout, matcode);
-    printf("nz=%d M=%d N=%d\n",nz,M,N);
+    //mm_write_banner(stdout, matcode);
+    //printf("nz=%d M=%d N=%d\n",nz,M,N);
     
     int* dI;
     int* dJ;
@@ -227,8 +223,8 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
     //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    InitColStart<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col);
-    findColStart<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
+    InitCol_ptr<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col);
+    findCol_ptr<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
@@ -243,13 +239,13 @@ int main(int argc, char *argv[])
     cudaEventElapsedTime(&time, start, stop);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    printf("Time for Counting triangles  %f  ms \n", time);
+    printf("%f  ms ", time);
 
 
 
 
 
-    printf("The sum is  %d\n",tot );
+    printf(" Trianles =  %d\n",tot );
 
 
 

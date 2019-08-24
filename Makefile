@@ -12,3 +12,15 @@ all: qsort-main.o qsort-pthreads.o
 
 clean:
 	rm -f *.o *~ $(CMAIN)
+
+
+
+APPS=hello
+
+all: ${APPS}
+
+%: %.cu
+	nvcc -O2 -arch=sm_20 -o $@ $<
+clean:
+	rm -f ${APPS}
+
