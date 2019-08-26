@@ -67,7 +67,10 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
     int tid=threadIdx.x;
     __shared__ int blockCol[sharedsize];//len of column
     int a;
-    bitmap=bitmap+
+     if(threadIdx.x==0 && blockIdx.x ==0){
+        printf("hala\n");
+    }
+    bitmap=bitmap+blockIdx.x*N/32;
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
         //if(threadIdx.x==0 && blockIdx.x==0){
         //printf("blockIdx=%d\n",blockIdx.x );}
@@ -186,6 +189,8 @@ int main(int argc, char *argv[])
     //mm_write_banner(stdout, matcode);
     //printf("nz=%d M=%d N=%d\n",nz,M,N);
     
+    int threadsPerBlock=atoi(argv[2]);
+    int Blocks=atoi(argv[3]);    
     int* dI;
     int* dJ;
     int* col;
@@ -195,14 +200,12 @@ int main(int argc, char *argv[])
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
     CUDA_CALL(cudaMalloc(&out, nz*sizeof(int)));
-    CUDA_CALL(cudaMalloc(&bitmap, N*ceil(N/Blocks)* Blocks));
+    CUDA_CALL(cudaMalloc(&bitmap, N* Blocks));
 
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
 
-    int threadsPerBlock=atoi(argv[2]);
-    int Blocks=atoi(argv[3]);    
     float time;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);

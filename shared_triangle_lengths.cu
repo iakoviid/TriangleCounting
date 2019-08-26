@@ -64,6 +64,9 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     int s=0;
     __shared__ int nt[256];  
     __shared__ int blockCol[sharedsize];//len of column
+    if(threadIdx.x==0 && blockIdx.x ==0){
+        printf("hala\n");
+    }
     int tid=threadIdx.x;
 
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
@@ -115,9 +118,9 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                         r1=blockCol[k1];
                         r2=dI[k2];
 
-                if(threadIdx.x==0 && blockIdx.x==0){
-                    printf("i=%d x=%d j=%d s=%d\n",i,x,k2,s);
-                }
+                //if(threadIdx.x==0 && blockIdx.x==0){
+                 //   printf("i=%d x=%d j=%d s=%d\n",i,x,k2,s);
+                //}
 
                     }else if(r1>r2){
                         k2++;
