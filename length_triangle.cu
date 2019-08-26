@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
     //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    InitColStart<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col);
+    InitColStart<<</*ceil(N/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(N,col);
     findColStart<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
 
 

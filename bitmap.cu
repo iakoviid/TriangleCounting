@@ -213,12 +213,12 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
     //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    Init<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col,out);
-    findCol_ptr<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
+    Init<<</*ceil(N/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(N,col,out);
+    findCol_ptr<<</*ceil(nz/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(dJ,nz,col);
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
-    computeRow2<<<ceil(N/Blocks), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N,bitmap);
+    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N,bitmap);
       
     
     thrust::device_ptr<int> outptr(out);

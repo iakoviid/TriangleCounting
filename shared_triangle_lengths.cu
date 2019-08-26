@@ -64,9 +64,9 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     int s=0;
     __shared__ int nt[256];  
     __shared__ int blockCol[sharedsize];//len of column
-    if(threadIdx.x==0 && blockIdx.x ==0){
-        printf("hala\n");
-    }
+    //if(threadIdx.x==0 && blockIdx.x ==0){
+    //    printf("hala\n");
+    //}
     int tid=threadIdx.x;
 
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
@@ -245,12 +245,12 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
     //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    Init<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col,out);
-    findCol_ptr<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
+    Init<<</*ceil(N/threadsPerBlock), */Blocks,threadsPerBlock>>>(N,col,out);
+    findCol_ptr<<</*ceil(nz/threadsPerBlock),*/Blocks,threadsPerBlock>>>(dJ,nz,col);
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
-    computeRow2<<<ceil(N/Blocks), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
+    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
       
     
     thrust::device_ptr<int> outptr(out);
