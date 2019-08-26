@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
     CUDA_CALL(cudaFree(out));
     CUDA_CALL(cudaFree(dI));
     CUDA_CALL(cudaFree(dJ));
-    CUDA_CALL(cudaFree(col));
+    CUDA_CALL(cudaFree(col_ptr));
 
 
     return 0;

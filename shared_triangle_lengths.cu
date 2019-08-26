@@ -20,6 +20,8 @@
     }                                                                          \
   }
 
+
+
 __global__ void findCol_ptr(int *dJ, int nz, int *col) {
   
  for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<nz;i+=gridDim.x*blockDim.x){
@@ -35,57 +37,61 @@ __global__ void findCol_ptr(int *dJ, int nz, int *col) {
     if(i==nz-1){
         col[x+1]=nz;
     }
-    if(i==0){
+    if(i==1){
     col[0]=0;
 
   }
   }
   } 
 }
-__global__ void InitCol_ptr(int len, int *col) {
-  for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<len;i+=gridDim.x*blockDim.x){
-  if(i<len){
+/*Initialize each element of the column pointer to -1 so that we can distinguish the empty columns*/
+__global__ void Init(int N, int *col,int* out) {
+  for(int i = blockIdx.x * blockDim.x + threadIdx.x; i<N;i+=gridDim.x*blockDim.x){
+  if(i<N){
         col[i]=-1;
+  }
+  if(i<gridDim.x){
+    out[i]=0;}
 
-  }}
+}
+
+
 }
 
 #define sharedsize 65
 
 __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
-    int i=blockIdx.x;
-    while(i<N){
+    int s=0;
+    __shared__ int nt[64];  
+    __shared__ int blockCol[sharedsize];//len of column
+    int tid=threadIdx.x;
+
+    for(int i=blockIdx.x;i<N;i+=gridDim.x){
         //if(threadIdx.x==0 && blockIdx.x==0){
         //printf("blockIdx=%d\n",blockIdx.x );}
-        __shared__ int blockCol[sharedsize];//len of column
-        __shared__ int nt[sharedsize];  
         int colStart=col[i];
         int len;
         if(i<N-1){
         len= col[i+1]-col[i];}
         else{len= 0;}
-        int tid=threadIdx.x;
         if(colStart<0 || len==0){
-            if(tid<32){
-            out[i]=0;}
-            return;
-        }
+          
+
+        }else{
 
       
         for(int j=tid;j<len;j+=blockDim.x)
         {   
-            if(dJ[j+colStart]==i){
                 blockCol[j]=dI[j+colStart];
-                }
+                
         }
           __syncthreads();
 
       
          int k1;
          int k2;
-         int s;
         for(int j=tid;j<len;j+=blockDim.x)
-        {   s=0;
+        {   
             k1=0;
             int x=blockCol[j];
             k2=col[x];
@@ -114,17 +120,15 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                     if(k2==nz){break;}
                     r1=blockCol[k1];
                     r2=dI[k2];
-                }
-            }
+                }}
 
-            nt[j]=s;
         }
-        __syncthreads();
-        
-        for(int j=tid+blockDim.x;j<len;j+=blockDim.x){
-        nt[tid]=nt[tid]+nt[j];
-        
-        }
+
+
+      }
+      
+      }
+              nt[tid]=s;
         __syncthreads();
 
 
@@ -137,10 +141,9 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
         }
 
         if(tid<32){
-        out[i]=nt[0];}
-      
-        i+=gridDim.x;
-      }
+        out[blockIdx.x]+=nt[0];}
+
+
 }
 
 
@@ -216,22 +219,24 @@ int main(int argc, char *argv[])
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
 
     int threadsPerBlock=atoi(argv[2]);
-    int Blocks=atoi(argv[3]);    float time;
+    int Blocks=atoi(argv[3]);    
+    float time;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
     //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    InitCol_ptr<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col);
+    Init<<<ceil(N/threadsPerBlock), Blocks,threadsPerBlock>>>(N,col,out);
     findCol_ptr<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
     computeRow2<<<ceil(N/Blocks), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
       
+    
     thrust::device_ptr<int> outptr(out);
-    int tot = thrust::reduce(outptr, outptr + N); 
+    int tot = thrust::reduce(outptr, outptr + Blocks); 
     
 
     cudaEventRecord(stop, 0);

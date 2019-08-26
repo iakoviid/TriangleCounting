@@ -15,24 +15,6 @@ void findColStart(int *dJ, int len, int *col) {
     }
 }
 
- void colLengths(int len, int *col) {
-for(int i=0;i<len ;i++ ){
-  if(i<len-1){
-        int s=i;
-        while(col[s]==-1){
-                    if(i==448627){
-                        printf("s=%d\n",s );}
-
-            s++;
-            if(s==len-1){
-                printf("Lexit %d\n",i);
-                break;}
-        }
-        col[i]=col[s];
-
-  }}
-}
-
  void InitColStart(int len, int *col) {
   for(int i=0;i<len;i++){
   if(i<len){
@@ -53,10 +35,10 @@ for(int i=0;i<len ;i++ ){
     int r2;
     if(k1>=0){
     while(dJ[k1]==x && dJ[k2]==y ) {
-        if(i==2447544){
-            printf("k1=%d k2=%d\n",k1,k2 );
+        //if(i==2447544){
+         //   printf("k1=%d k2=%d\n",k1,k2 );
                   
-        }
+        //}
         if(k1>=nz || k2>=nz ){break;}
         r1=dI[k1];
         r2=dI[k2];
@@ -70,12 +52,12 @@ for(int i=0;i<len ;i++ ){
         }else{
             k1++;
         }
-             if(i==2447544){
-            printf("x=%d y=%d  ",x,y );
-            printf("r1=%d r2=%d  ",r1,r2 );
-            printf("k1=%d k2=%d\n",k1,k2 );
+          //   if(i==2447544){
+           // printf("x=%d y=%d  ",x,y );
+            //printf("r1=%d r2=%d  ",r1,r2 );
+            //printf("k1=%d k2=%d\n",k1,k2 );
                   
-        }
+       // }
         
 
     }}
@@ -94,52 +76,6 @@ int reduce(int* out,int nz){
     return s;
 }
 
-void compute2(int* dI,int* dJ,int nz,int* col,int* out){
-  for(int i=0;i<nz;i++){
-    if(i==2447544){
-            printf("break\n");
-        }
-    if(i<nz){
-    int s=0;
-    int x=dI[i];
-    int y=dJ[i];
-    int k1=col[x];
-    int k2=col[y];
-    int r1;
-    int r2;
-    if(k1>=0){
-    int len1=col[x+1];
-    int len2=col[y+1];
-
-    while(k1<len1 && k2<len2 ) {
-        if(i==2447544){
-            printf("k1=%d k2=%d\n",k1,k2 );
-                  
-        }
-        if(k1>=nz || k2>=nz ){break;}
-        r1=dI[k1];
-        r2=dI[k2];
-        if(r1==r2){
-            s++;      
-            k1++;
-            k2++;
-        }else if(r1>r2){
-            k2++;
-
-        }else{
-            k1++;
-        }
-     if(i==2447544){
-            printf("x=%d y=%d  ",x,y );
-            printf("r1=%d r2=%d  ",r1,r2 );
-            printf("k1=%d k2=%d\n",k1,k2 );
-                  
-        }
-    }
-    }
-    out[i]=s;
-  }
-}}
 int main(int argc, char *argv[])
 {
     int ret_code;
@@ -195,10 +131,10 @@ int main(int argc, char *argv[])
 
     
 
-    mm_write_banner(stdout, matcode);
+    //mm_write_banner(stdout, matcode);
 
 
-    printf("nz=%d M=%d N=%d\n",nz,M,N);
+    //printf("nz=%d M=%d N=%d\n",nz,M,N);
   
     int* col=(int *)malloc(N* sizeof(int));
     int* out=(int*)malloc(nz*sizeof(int));
@@ -209,17 +145,7 @@ int main(int argc, char *argv[])
     compute(I,J,nz,col,out) ;
     int s=reduce(out,nz);
     printf("%d\n",s );
-    colLengths(N,col);
-    compute2(I,J,nz,col,out2);
-    for(int i=0;i<nz;i++){
-        if(out[i]!=out2[i]){
-           printf("error i=%d\n",i );
-        }
-    }
-    printf("%d\n",s );
-    s=reduce(out2,nz);
-    printf("%d\n",s );
-
+   
 
 
 	return 0;

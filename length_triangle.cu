@@ -35,7 +35,7 @@ __global__ void findColStart(int *dJ, int nz, int *col) {
     if(i==nz-1){
         col[a+1]=nz;
     }
-    if(i==0){
+    if(i==1){
     col[0]=0;
 
   }
@@ -45,31 +45,15 @@ __global__ void findColStart(int *dJ, int nz, int *col) {
 
 
 __global__ void InitColStart(int len, int *col) {
-  for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<len;i+=gridDim.x*blockDim.x){
+  for(int i = blockIdx.x * blockDim.x + threadIdx.x; i<len;i+=gridDim.x*blockDim.x){
   if(i<len){
         col[i]=-1;
 
   }}
 }
-/*__global__ void colLengths(int len, int *col) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if(i<len-1){
-        int s=i;
-        while(col[s]==-1){
-            s++;
-            if(s==len-1){
-                if(col[i-1]!=0){
-                    
-                }
-                break;}
-        }
-        col[i]=col[s];
-  }
-}
-*/
 
 __global__ void compute(int* dI,int* dJ,int nz,int* col,int* out) {
- for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<nz;i+=gridDim.x*blockDim.x){
+ for(int i = blockIdx.x * blockDim.x + threadIdx.x; i<nz;i+=gridDim.x*blockDim.x){
 
   if(i<nz){
     int s=0;
@@ -158,8 +142,8 @@ int main(int argc, char *argv[])
 
     if (f !=stdin) fclose(f);
 
-    mm_write_banner(stdout, matcode);
-    printf("nz=%d M=%d N=%d\n",nz,M,N);
+    //mm_write_banner(stdout, matcode);
+    //printf("nz=%d M=%d N=%d\n",nz,M,N);
     
     int* dI;
     int* dJ;
