@@ -9,8 +9,9 @@
 #include <thrust/random.h>
 #include <thrust/sort.h>
 #include <time.h>
-
-
+#define SetBit(A,k)     ( A[(k/32)] |= (1 << (k%32)) )         
+#define ClearBit(A,k)   ( A[(k/32)] &= ~(1 << (k%32)) )
+#define TestBit(A,k)    ( A[(k/32)] & (1 << (k%32)) )
 #define CUDA_CALL(x)                                                           \
   {                                                                            \
     if ((x) != cudaSuccess) {                                                  \
@@ -60,12 +61,13 @@ __global__ void Init(int N, int *col,int* out) {
 
 #define sharedsize 65
 
-__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
+__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int* bitmap) {
     int s=0;
-    __shared__ int nt[256];  
-    __shared__ int blockCol[sharedsize];//len of column
+    __shared__ int nt[64];  
     int tid=threadIdx.x;
-
+    __shared__ int blockCol[sharedsize];//len of column
+    int a;
+    bitmap=bitmap+
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
         //if(threadIdx.x==0 && blockIdx.x==0){
         //printf("blockIdx=%d\n",blockIdx.x );}
@@ -82,62 +84,26 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
       
         for(int j=tid;j<len;j+=blockDim.x)
         {   
-                blockCol[j]=dI[j+colStart];
+                a=dI[j+colStart];
+                SetBit(bitmap,a);
+                blockCol[j]=a;
+
                 
         }
           __syncthreads();
 
-      
-         int k1;
-         int k2;
-        for(int j=tid;j<len;j+=blockDim.x)
-        {   
-            k1=0;
-            int x=blockCol[j];
-            k2=col[x];
-            int r1;
-            int r2;
-            if(k2>0){
+        for(a=0;a<len;a++){
+            int x=blockCol[a];
+            int k=col[x];
+            if(k>0){
                 int len2=col[x+1];
-                r1=blockCol[k1];
-                r2=dI[k2];
-                while(k1<len && k2<len2 ) {
-                //    if(threadIdx.x==0&& i ==0){
-                //       printf("r1=%d,r2=%d\n",r1,r2 );
-                //        printf("k1=%d,k2=%d\n",k1,k2 );
-                //    }
-                    if(r1==r2){
-                        s++;      
-                        k1++;
-                        k2++;
-                        if(k2==nz || k1==len ){break;}
-
-                        r1=blockCol[k1];
-                        r2=dI[k2];
-
-                if(threadIdx.x==0 && blockIdx.x==0){
-                    printf("i=%d x=%d j=%d s=%d\n",i,x,k2,s);
-                }
-
-                    }else if(r1>r2){
-                        k2++;
-                        if(k2==nz){break;}
-
-                        r2=dI[k2];
-
-                    }else{
-                    k1++;
-                    if(k1==len ){break;}
-
-                    r1=blockCol[k1];
-
-                    }
-                    if(k2==nz){break;}
-                    
-                }}
-
-
-        }
+                for(int j=tid+k;j<len2;j+=blockDim.x)
+                 {   
+                    if(TestBit(bitmap,dI[j])){s++;}
+                 }
+            }
+        } 
+        
 
 
       }
@@ -224,10 +190,12 @@ int main(int argc, char *argv[])
     int* dJ;
     int* col;
     int* out;
+    int* bitmap;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
     CUDA_CALL(cudaMalloc(&out, nz*sizeof(int)));
+    CUDA_CALL(cudaMalloc(&bitmap, N*ceil(N/Blocks)* Blocks));
 
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
@@ -247,7 +215,7 @@ int main(int argc, char *argv[])
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
-    computeRow2<<<ceil(N/Blocks), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
+    computeRow2<<<ceil(N/Blocks), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N,bitmap);
       
     
     thrust::device_ptr<int> outptr(out);
@@ -270,7 +238,7 @@ int main(int argc, char *argv[])
 
 
 
-
+    CUDA_CALL(cudaFree(bitmap));
     CUDA_CALL(cudaFree(out));
     CUDA_CALL(cudaFree(dI));
     CUDA_CALL(cudaFree(dJ));

@@ -28,18 +28,21 @@ void findColStart(int *dJ, int nz, int *col) {
 
 
  void InitColStart(int len, int *col) {
+
   for(int i=0;i<len;i++){
+  
   if(i<len){
         col[i]=-1;
 
-  }}
+  }
 }
-
+}
+/*
 #define sharedsize 64
 
  void computeRow(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     int blockCol[sharedsize];//len of column
-         int nt[sharedsize];
+    int nt[sharedsize];
     for(int i=0;i<N;i++){
         if(i%1000==0){
         printf("%d\n",i );}
@@ -136,7 +139,7 @@ void findColStart(int *dJ, int nz, int *col) {
    
        
 }
-
+*/
 
 
 void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
@@ -170,7 +173,12 @@ void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
 
     }
  }
-
+ if(dJ[i]%7010==7009){
+    printf("Ready poy\n");
+ }
+ if(dJ[i]%7010==0){
+    printf("Hala\n");
+ }
 
 
     out[i]=s;
@@ -260,15 +268,20 @@ int main(int argc, char *argv[])
 
     InitColStart(N,col);
     findColStart(J,nz,col);
-    int* out2=(int*)malloc(N*sizeof(int));
-    computeRow(I,J,nz,col,out2,N);
-    int d=reduce(out2,N);
-    printf("%d\n",d );
-    for(int i;i< 20;i++){printf("%d-",out[i] );}
+    //int* out2=(int*)malloc(N*sizeof(int));
+    //computeRow(I,J,nz,col,out2,N);
+    //int d=reduce(out2,N);
+    //printf("%d\n",d );
+    s=0;
+    for(int i;i< nz;i++){
+        if(i%7010==0){
+        s=s+out[i];
+        printf("out  %d , s=%d\n",out[i],s );}
+    }
     printf("\n");
     printf("\n");
 
-    for(int i;i< 20;i++){printf("%d-",out2[i] );}
+    //for(int i;i< 20;i++){printf("%d-",out2[i] );}
 
 
 
