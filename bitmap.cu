@@ -67,9 +67,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
     int tid=threadIdx.x;
     __shared__ int blockCol[sharedsize];//len of column
     int a;
-     if(threadIdx.x==0 && blockIdx.x ==0){
-        printf("hala\n");
-    }
+     
     bitmap=bitmap+blockIdx.x*N/32;
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
         //if(threadIdx.x==0 && blockIdx.x==0){
