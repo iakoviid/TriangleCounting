@@ -155,6 +155,7 @@ int main(int argc, char *argv[])
     CUDA_CALL(cudaMalloc(&out, nz*sizeof(int)));
 
 
+
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
 
@@ -166,13 +167,13 @@ int main(int argc, char *argv[])
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
-    //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
+    CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    InitColStart<<</*ceil(N/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(N,col);
-    findColStart<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dJ,nz,col);
+    //InitColStart<<< Blocks,threadsPerBlock>>>(N,col);
+    findColStart<<< Blocks,threadsPerBlock>>>(dJ,nz,col);
 
 
-    compute<<<ceil(nz/threadsPerBlock), Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out);
+    compute<<<Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out);
       
     thrust::device_ptr<int> outptr(out);
     int tot = thrust::reduce(outptr, outptr + nz); 

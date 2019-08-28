@@ -58,11 +58,19 @@ __global__ void Init(int N, int *col,int* out) {
 
 }
 
-#define sharedsize 65
+__device__ void warpReduce(volatile int* sdata,int tid ){
+    sdata[tid]+=sdata[tid +32];
+    sdata[tid]+=sdata[tid +16];
+    sdata[tid]+=sdata[tid +8];
+    sdata[tid]+=sdata[tid +4];
+    sdata[tid]+=sdata[tid +2];
+    sdata[tid]+=sdata[tid +1];
+}
+#define sharedsize 33
 
 __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     int s=0;
-    __shared__ int nt[256];  
+    extern __shared__ int nt[];  
     __shared__ int blockCol[sharedsize];//len of column
     //if(threadIdx.x==0 && blockIdx.x ==0){
     //    printf("hala\n");
@@ -77,10 +85,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
         if(i<N-1){
         len= col[i+1]-col[i];}
         else{len= 0;}
-        if(colStart<0 || len==0){
-          
-
-        }else{
+        if(colStart>=0 && len!=0){
 
       
         for(int j=tid;j<len;j+=blockDim.x)
@@ -95,7 +100,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
          int k2;
         for(int j=tid;j<len;j+=blockDim.x)
         {   
-            k1=0;
+            k1=j+1;
             int x=blockCol[j];
             k2=col[x];
             int r1;
@@ -151,12 +156,13 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
 
 
         //do reduction in shared mem 
-        for( s=blockDim.x/2; s>0;s>>=1){
+        for( s=blockDim.x/2; s>32;s>>=1){
             if(tid<s){
             nt[tid]+=nt[tid+s];
             }
         __syncthreads();
         }
+    if(tid<32){ warpReduce(nt,tid);}
 
         if(tid<32){
         out[blockIdx.x]+=nt[0];}
@@ -169,7 +175,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
 
 int main(int argc, char *argv[])
 {
-    int ret_code;
+int ret_code;
         MM_typecode matcode;
         FILE *f;
         int M, N, nz;   
@@ -250,7 +256,7 @@ int main(int argc, char *argv[])
     //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
 
 
-    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
+    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N);
       
     
     thrust::device_ptr<int> outptr(out);

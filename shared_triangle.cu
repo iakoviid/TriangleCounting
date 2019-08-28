@@ -19,7 +19,7 @@
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   }
-
+/*
 __global__ void findColStart(int *dJ, int len, int *col_ptr) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if(i<len){
@@ -32,6 +32,30 @@ __global__ void findColStart(int *dJ, int len, int *col_ptr) {
   }}
 
 
+}
+*/
+
+__global__ void findColStart(int *dJ, int nz, int *col) {
+  
+ for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<nz;i+=gridDim.x*blockDim.x){
+     if(i<nz){
+    int a=dJ[i];
+    int b=dJ[i-1];
+    if (a != b) {
+      col[a] = i;
+    
+    if(b+1!=a){
+        col[b + 1] = i;
+    }}
+    if(i==nz-1){
+        col[a+1]=nz;
+    }
+    if(i==1){
+    col[0]=0;
+
+  }
+  }
+  } 
 }
 
 __global__ void InitColStart(int len, int *col_ptr) {

@@ -70,6 +70,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
      
     bitmap=bitmap+blockIdx.x*N/32;
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
+
         //if(threadIdx.x==0 && blockIdx.x==0){
         //printf("blockIdx=%d\n",blockIdx.x );}
         int colStart=col[i];
@@ -82,7 +83,17 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
 
         }else{
 
-      
+        for(int j=tid;j<N;j+=blockDim.x)
+        {   
+                
+                ClearBit(bitmap,j);
+
+                
+        }
+          __syncthreads();
+
+
+             
         for(int j=tid;j<len;j+=blockDim.x)
         {   
                 a=dI[j+colStart];
