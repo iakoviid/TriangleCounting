@@ -70,7 +70,7 @@ __device__ void warpReduce(volatile int* sdata,int tid ){
 
 __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     int s=0;
-    extern __shared__ int nt[];  
+     extern __shared__ int nt[];  
     __shared__ int blockCol[sharedsize];//len of column
     //if(threadIdx.x==0 && blockIdx.x ==0){
     //    printf("hala\n");
@@ -85,7 +85,10 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
         if(i<N-1){
         len= col[i+1]-col[i];}
         else{len= 0;}
-        if(colStart>=0 && len!=0){
+        if(colStart<0 || len==0){
+          
+
+        }else{
 
       
         for(int j=tid;j<len;j+=blockDim.x)
@@ -175,7 +178,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
 
 int main(int argc, char *argv[])
 {
-int ret_code;
+    int ret_code;
         MM_typecode matcode;
         FILE *f;
         int M, N, nz;   
@@ -229,6 +232,8 @@ int ret_code;
     //mm_write_banner(stdout, matcode);
     //printf("nz=%d M=%d N=%d\n",nz,M,N);
     
+    int threadsPerBlock=atoi(argv[2]);
+    int Blocks=atoi(argv[3]);
     int* dI;
     int* dJ;
     int* col;
@@ -236,27 +241,25 @@ int ret_code;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
-    CUDA_CALL(cudaMalloc(&out, nz*sizeof(int)));
+    CUDA_CALL(cudaMalloc(&out, Blocks*sizeof(int)));
 
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
-
-    int threadsPerBlock=atoi(argv[2]);
-    int Blocks=atoi(argv[3]);    
+  
     float time;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
-    //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
-
-    Init<<</*ceil(N/threadsPerBlock), */Blocks,threadsPerBlock>>>(N,col,out);
-    findCol_ptr<<</*ceil(nz/threadsPerBlock),*/Blocks,threadsPerBlock>>>(dJ,nz,col);
-    //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
+    CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
+    CUDA_CALL(cudaMemset(out, 0, Blocks* (sizeof(int))));
 
 
-    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N);
+    findCol_ptr<<<Blocks,threadsPerBlock>>>(dJ,nz,col);
+    
+
+    computeRow2<<<Blocks,threadsPerBlock,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
       
     
     thrust::device_ptr<int> outptr(out);
