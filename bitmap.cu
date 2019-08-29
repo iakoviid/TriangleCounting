@@ -68,7 +68,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
     __shared__ int blockCol[sharedsize];//len of column
     int a;
      
-    bitmap=bitmap+blockIdx.x*N/32;
+    //bitmap=bitmap+blockIdx.x*N;
     for(int i=blockIdx.x;i<N;i+=gridDim.x){
 
         //if(threadIdx.x==0 && blockIdx.x==0){
@@ -86,7 +86,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
         for(int j=tid;j<N;j+=blockDim.x)
         {   
                 
-                ClearBit(bitmap,j);
+                ClearBit(bitmap,j+blockIdx.x*N);
 
                 
         }
@@ -97,7 +97,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
         for(int j=tid;j<len;j+=blockDim.x)
         {   
                 a=dI[j+colStart];
-                SetBit(bitmap,a);
+                SetBit(bitmap,a+blockIdx.x*N);
                 blockCol[j]=a;
 
                 
@@ -111,7 +111,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int*
                 int len2=col[x+1];
                 for(int j=tid+k;j<len2;j+=blockDim.x)
                  {   
-                    if(TestBit(bitmap,dI[j])){s++;}
+                    if(TestBit(bitmap,dI[j]+blockIdx.x*N)){s++;}
                  }
             }
         } 

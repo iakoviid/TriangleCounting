@@ -44,19 +44,7 @@ __global__ void findCol_ptr(int *dJ, int nz, int *col) {
   }
   } 
 }
-/*Initialize each element of the column pointer to -1 so that we can distinguish the empty columns*/
-__global__ void Init(int N, int *col,int* out) {
-  for(int i = blockIdx.x * blockDim.x + threadIdx.x; i<N;i+=gridDim.x*blockDim.x){
-  if(i<N){
-        col[i]=-1;
-  }
-  if(i<gridDim.x){
-    out[i]=0;}
 
-}
-
-
-}
 
 __device__ void warpReduce(volatile int* sdata,int tid ){
     sdata[tid]+=sdata[tid +32];
@@ -66,43 +54,12 @@ __device__ void warpReduce(volatile int* sdata,int tid ){
     sdata[tid]+=sdata[tid +2];
     sdata[tid]+=sdata[tid +1];
 }
-#define sharedsize 33
-
-__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
-    int s=0;
-     extern __shared__ int nt[];  
-    __shared__ int blockCol[sharedsize];//len of column
-    //if(threadIdx.x==0 && blockIdx.x ==0){
-    //    printf("hala\n");
-    //}
-    int tid=threadIdx.x;
-
-    for(int i=blockIdx.x;i<N;i+=gridDim.x){
-        //if(threadIdx.x==0 && blockIdx.x==0){
-        //printf("blockIdx=%d\n",blockIdx.x );}
-        int colStart=col[i];
-        int len;
-        if(i<N-1){
-        len= col[i+1]-col[i];}
-        else{len= 0;}
-        if(colStart<0 || len==0){
-          
-
-        }else{
-
-      
-        for(int j=tid;j<len;j+=blockDim.x)
-        {   
-                blockCol[j]=dI[j+colStart];
-                
-        }
-          __syncthreads();
-
-      
-         int k1;
-         int k2;
-        for(int j=tid;j<len;j+=blockDim.x)
-        {   
+#define sharedsize 256
+__device__ int ComputeIntersection(int* blockCol,int* col,int len,int nz,int* dI,int j){    
+        int k1;
+        int k2;
+        int s=0;
+       
             k1=j+1;
             int x=blockCol[j];
             k2=col[x];
@@ -113,10 +70,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                 r1=blockCol[k1];
                 r2=dI[k2];
                 while(k1<len && k2<len2 ) {
-                //    if(threadIdx.x==0&& i ==0){
-                //       printf("r1=%d,r2=%d\n",r1,r2 );
-                //        printf("k1=%d,k2=%d\n",k1,k2 );
-                //    }
+               
                     if(r1==r2){
                         s++;      
                         k1++;
@@ -126,9 +80,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                         r1=blockCol[k1];
                         r2=dI[k2];
 
-                //if(threadIdx.x==0 && blockIdx.x==0){
-                 //   printf("i=%d x=%d j=%d s=%d\n",i,x,k2,s);
-                //}
+               
 
                     }else if(r1>r2){
                         k2++;
@@ -148,12 +100,59 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                 }}
 
 
+        
+        return s;
+    }
+
+//Make lens nt something
+__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int k) {
+    int s=0;
+    int j;
+    extern __shared__ int nt[];  
+    __shared__ int blockCol[sharedsize];
+
+    int tid=threadIdx.x;
+
+    for(int i=blockIdx.x;i<N;i+=gridDim.x){
+
+        int a=0;
+        int b=-1;
+        int len;
+        int colStart;
+        for(j=0;j<k;j++){
+
+        
+        if(k*i+j<N-1){
+        colStart=col[k*i+j];
+        len= col[k*i+1+j]-colStart;}
+        else{len= 0;}
+
+        if(colStart>=0 && len!=0){
+            a=a+len;
+            if(b==-1){
+                b=colStart;
+            }
         }
+        }
+        colStart=b;
+        for( j=tid;j<a;j+=blockDim.x)
+        {   
+                blockCol[j]=dI[j+colStart];
+                
+        }
+          __syncthreads();
 
 
-      }
+     for( j=tid;j<a;j+=blockDim.x)
+        {   
+        s=s+ComputeIntersection(blockCol,col,len,nz, dI, j);
+     }
+
+
+      
       
       }
+
               nt[tid]=s;
         __syncthreads();
 
@@ -231,7 +230,7 @@ int main(int argc, char *argv[])
 
     //mm_write_banner(stdout, matcode);
     //printf("nz=%d M=%d N=%d\n",nz,M,N);
-    
+    int k=atoi(argv[4]);
     int threadsPerBlock=atoi(argv[2]);
     int Blocks=atoi(argv[3]);
     int* dI;
@@ -259,7 +258,7 @@ int main(int argc, char *argv[])
     findCol_ptr<<<Blocks,threadsPerBlock>>>(dJ,nz,col);
     
 
-    computeRow2<<<Blocks,threadsPerBlock,threadsPerBlock>>>(dI,dJ,nz,col,out,N);
+    computeRow2<<<Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N,k);
       
     
     thrust::device_ptr<int> outptr(out);

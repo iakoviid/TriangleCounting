@@ -108,7 +108,7 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N) {
     
     int tid=threadIdx.x;
 
-    for(int i=blockIdx.x;i<N;i+=gridDim.x+3){
+    for(int i=blockIdx.x;i<N;i+=gridDim.x){
         
         int colStart=col[i];
         int len;
@@ -126,6 +126,7 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N) {
                     blockCol[j]=dI[j+colStart];
                     
             }
+
             __syncthreads();
             
             ComputeIntersections(len,nz,tid,blockCol,col,dI,&s);
@@ -194,11 +195,7 @@ int main(int argc, char *argv[])
     
   /*--------Allocate device data and Transfer---------*/
     /*Start time counting with CUDA envents*/
-    float time;
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+   
     int* dI;
     int* dJ;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
@@ -206,13 +203,18 @@ int main(int argc, char *argv[])
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
-            printf("Halla\n");
+         
 
     /*Allocate output(nt found by the threds/blocks) and col_ptr (ptrs to columns starts) arrays*/
     int* col_ptr;
     int* out;
     CUDA_CALL(cudaMalloc(&col_ptr, N*sizeof(int)));
     CUDA_CALL(cudaMalloc(&out, Blocks*sizeof(int)));
+     float time;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
     /*Record time*/
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
