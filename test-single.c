@@ -173,12 +173,6 @@ void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
 
     }
  }
- if(dJ[i]%7010==7009){
-    printf("Ready poy\n");
- }
- if(dJ[i]%7010==0){
-    printf("Hala\n");
- }
 
 
     out[i]=s;
@@ -272,15 +266,10 @@ int main(int argc, char *argv[])
     //computeRow(I,J,nz,col,out2,N);
     //int d=reduce(out2,N);
     //printf("%d\n",d );
-    s=0;
-    for(int i;i< nz;i++){
-        if(i%7010==0){
-        s=s+out[i];
-        printf("out  %d , s=%d\n",out[i],s );}
+    for(int i=0;i<50;i++){
+        printf("out[%d]=%d\n",i,out[i] );
     }
-    printf("\n");
-    printf("\n");
-
+    printf("dJ[%d]=%d\n",137,J[137] );
     //for(int i;i< 20;i++){printf("%d-",out2[i] );}
 
 

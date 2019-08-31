@@ -105,7 +105,7 @@ __device__ int ComputeIntersection(int* blockCol,int* col,int len,int nz,int* dI
     }
 
 //Make lens nt something
-__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int k) {
+__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int k,int* out2) {
     int s=0;
     int j;
     extern __shared__ int nt[];  
@@ -178,9 +178,10 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
             b=0;
             for(int x=0;x<k;x++){
                 b=b+nt[x];
-                if(x<b){break;}
+                if(j<b){break;}
             }
         s=s+ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
+            out2[j+colStart]=ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
      }
 
 
@@ -207,6 +208,64 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
 
 }
 
+
+void findColStart2(int *dJ, int nz, int *col) {
+  for(int i=1;i<nz;i++){
+   if(i<nz){
+    int a=dJ[i];
+    int b=dJ[i-1];
+    if (a != b) {
+      col[a] = i;
+    
+    if(b+1!=a){
+        col[b + 1] = i;
+    }}
+    if(i==nz-1){
+        col[a+1]=nz;
+    }
+    if(i==1){
+    col[0]=0;
+
+  }
+  }
+    }
+}
+void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
+  for(int i=0;i<nz;i++){  
+    if(i<nz){
+    int s=0;
+    int x=dI[i];
+    int y=dJ[i];
+    int k1=col[x];
+    int k2=col[y];
+    int r1;
+    int r2;
+    if(k1>0){
+    int len1=col[x+1];
+    int len2=col[y+1];
+    while(k1<len1 && k2<len2 ) {
+        if(k1>=nz || k2>=nz ){break;}
+        r1=dI[k1];
+        r2=dI[k2];
+        if(r1==r2){
+            s++;      
+            k1++;
+            k2++;
+        }else if(r1>r2){
+            k2++;
+
+        }else{
+            k1++;
+        }
+        
+
+    }
+ }
+
+
+    out[i]=s;
+  }
+}}
 
 
 
@@ -272,10 +331,12 @@ int main(int argc, char *argv[])
     int* dJ;
     int* col;
     int* out;
+    int* out2;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
     CUDA_CALL(cudaMalloc(&out, Blocks*sizeof(int)));
+    CUDA_CALL(cudaMalloc(&out2, nz*sizeof(int)));
 
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
@@ -293,11 +354,11 @@ int main(int argc, char *argv[])
     findCol_ptr<<<Blocks,threadsPerBlock>>>(dJ,nz,col);
     
 
-    computeRow2<<<Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N,k);
+    computeRow2<<<Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N,k,out2);
       
     
     thrust::device_ptr<int> outptr(out);
-    int tot = thrust::reduce(outptr, outptr + Blocks); 
+    int tot =thrust::reduce(outptr, outptr + Blocks); 
     
 
     cudaEventRecord(stop, 0);
@@ -312,15 +373,39 @@ int main(int argc, char *argv[])
 
 
     printf(" Trianles =  %d\n",tot );
+    int* elem=(int *)malloc(nz*sizeof(int));
 
+    cudaMemcpy(elem, out2,nz*sizeof(int), cudaMemcpyDeviceToHost);
+    //for(int i=0;i<50;i++){
+    //    printf("out2[%d]=%d\n",i,elem[i] );
+    //}
 
-
-
+    CUDA_CALL(cudaFree(out2));
 
     CUDA_CALL(cudaFree(out));
     CUDA_CALL(cudaFree(dI));
     CUDA_CALL(cudaFree(dJ));
     CUDA_CALL(cudaFree(col));
+
+
+    int* col_ptr=(int *)malloc(N*sizeof(int));
+    int* out3=(int *)malloc(nz*sizeof(int));
+    findColStart2(J,nz,col_ptr);
+     compute(I,J,nz,col_ptr,out3,N);
+
+     for(int i=0 ;i<1000;i++){
+        if(out3[i]!=elem[i]){
+            printf("i=%d  out3=%d elem=%d\n",i,out3[i],elem[i] );
+        }
+     }
+
+
+
+
+
+
+
+
 
 
     return 0;
