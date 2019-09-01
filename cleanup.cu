@@ -9,9 +9,8 @@
 #include <thrust/random.h>
 #include <thrust/sort.h>
 #include <time.h>
-#define SetBit(A,k)     ( A[(k/32)] |= (1 << (k%32)) )         
-#define ClearBit(A,k)   ( A[(k/32)] &= ~(1 << (k%32)) )
-#define TestBit(A,k)    ( A[(k/32)] & (1 << (k%32)) )
+
+
 #define CUDA_CALL(x)                                                           \
   {                                                                            \
     if ((x) != cudaSuccess) {                                                  \
@@ -21,128 +20,176 @@
     }                                                                          \
   }
 
+/*Size of shared memory that is used has to be greater than the max( sum of lengths of the columns)*sizeof(int) that we store*/
+#define sharedsize 512
 
 
-__global__ void findCol_ptr(int *dJ, int nz, int *col) {
+/*Making the col_ptr array st if i'th column is nonempty then col_ptr[i]=Start of i'th column 
+and col_ptr[i+1]-col_ptr[i] = length of i'th column*/
+__global__ void findCol_ptr(int *dJ, int nz, int *col_ptr) {
   
  for(int i = blockIdx.x * blockDim.x + threadIdx.x+1; i<nz;i+=gridDim.x*blockDim.x){
      if(i<nz){
     int x=dJ[i];
     int y=dJ[i-1];
     if (x != y) {
-      col[x] = i;
+      col_ptr[x] = i;
     
     if(y+1!=x){
-        col[y + 1] = i;
+        col_ptr[y + 1] = i;
     }}
     if(i==nz-1){
-        col[x+1]=nz;
+        col_ptr[x+1]=nz;
     }
     if(i==1){
-    col[0]=0;
+    col_ptr[0]=0;
 
   }
   }
   } 
 }
-/*Initialize each element of the column pointer to -1 so that we can distinguish the empty columns*/
-__global__ void Init(int N, int *col,int* out) {
-  for(int i = blockIdx.x * blockDim.x + threadIdx.x; i<N;i+=gridDim.x*blockDim.x){
-  if(i<N){
-        col[i]=-1;
-  }
-  if(i<gridDim.x){
-    out[i]=0;}
 
+/*Unrolled sum reduction of a Warp*/
+__device__ void warpReduce(volatile int* sdata,int tid ){
+    sdata[tid]+=sdata[tid +32];
+    sdata[tid]+=sdata[tid +16];
+    sdata[tid]+=sdata[tid +8];
+    sdata[tid]+=sdata[tid +4];
+    sdata[tid]+=sdata[tid +2];
+    sdata[tid]+=sdata[tid +1];
 }
+/*Counts the number of triangles for the j element in the blockCol array*/
+__device__ int ComputeIntersection(int* blockCol,int* col_ptr,int len,int nz,int* dI,int j){    
+        int k1;
+        int k2;
+        int s=0;
+        k1=j+1;
+        int x=blockCol[j];
+        k2=col_ptr[x];
+        int r1;
+        int r2;
+        if(k2>0){
+        int len2=col_ptr[x+1];
+        r1=blockCol[k1];
+        r2=dI[k2];
+        while(k1<len && k2<len2 ) {
+            if(r1==r2){
+                s++;      
+                k1++;
+                k2++;
+                if(k2==nz || k1==len ){break;}
 
+                r1=blockCol[k1];
+                r2=dI[k2];
 
-}
+       
 
-#define sharedsize 65
+            }else if(r1>r2){
+                k2++;
+                if(k2==nz){break;}
 
-__global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int* bitmap) {
-    int s=0;
-    __shared__ int nt[256];  
-    int tid=threadIdx.x;
-    __shared__ int blockCol[sharedsize];//len of column
-    int a;
-     
-    //bitmap=bitmap+blockIdx.x*N;
-    for(int i=blockIdx.x;i<N;i+=gridDim.x){
+                r2=dI[k2];
 
-        //if(threadIdx.x==0 && blockIdx.x==0){
-        //printf("blockIdx=%d\n",blockIdx.x );}
-        int colStart=col[i];
-        int len;
-        if(i<N-1){
-        len= col[i+1]-col[i];}
-        else{len= 0;}
-        if(colStart<0 || len==0){
-          
+            }else{
+            k1++;
+            if(k1==len ){break;}
 
-        }else{
-            //write it better
-        for(int j=tid;j<N;j+=blockDim.x)
-        {   
-                
-                ClearBit(bitmap,j+blockIdx.x*N);
+            r1=blockCol[k1];
 
-                
-        }
-          __syncthreads();
-
-
-             
-        for(int j=tid;j<len;j+=blockDim.x)
-        {   
-                a=dI[j+colStart];
-                SetBit(bitmap,a+blockIdx.x*N);
-                blockCol[j]=a;
-
-                
-        }
-          __syncthreads();
-
-        for(a=0;a<len;a++){
-            int x=blockCol[a];
-            int k=col[x];
-            if(k>0){
-                int len2=col[x+1];
-                for(int j=tid+k;j<len2;j+=blockDim.x)
-                 {   
-                    if(TestBit(bitmap,dI[j]+blockIdx.x*N)){
-                        printf("s");
-                        s++;}
-                 }
             }
-        } 
+            
+        }}
+
+
         
+        return s;
+    }
+/*Block counts the number of triangles for a number of columns*/
+
+__global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N,int k) {
+    int s=0;
+    int j;
+    extern __shared__ int nt[];  
+    __shared__ int blockCol[sharedsize];
+    int tid=threadIdx.x;
+    for(int i=blockIdx.x;i<N/k+1;i+=gridDim.x){
+    /*Find the lengths of k consequtive columns */
+        int a=0;
+        int b=-1;
+        int len;
+        int colStart;
+        for(j=0;j<k;j++){
+
+	        
+	        if(k*i+j<N-1){
+
+		        colStart=col[k*i+j];
+		        len= col[k*i+1+j]-colStart;
+	        }
+	        else{len= 0;}
+
+	        if(colStart>=0 && len!=0){
+	            if(tid<32){
+	            nt[j]=len;}
+	            a=a+len;
+	            if(b==-1){
+
+	                b=colStart;
+	            }
+	        }else{ 
+	            len=0;
+	             if(tid<32){
+	            nt[j]=len;}
 
 
-      }
+	        }
+        }
+      /*Load the columns*/
+        colStart=b;
+        for( j=tid;j<a;j+=blockDim.x)
+        {       
+
+
+                blockCol[j]=dI[j+colStart];
+                
+        }
+          __syncthreads();
+
+     /*Search each element of the columns*/
+     for( j=tid;j<a;j+=blockDim.x)
+        {   
+        	/*Find the apropriate length in the blockCol array*/
+            b=0;
+            for(int x=0;x<k;x++){
+                b=b+nt[x];
+                if(j<b){break;}
+            }
+        s=s+ComputeIntersection(blockCol,col,b ,nz, dI, j);
+     }
+
+
       
-      }
+      
+    }
+    /*Sum redusce the results of the threads*/
               nt[tid]=s;
         __syncthreads();
 
 
         //do reduction in shared mem 
-        for( s=blockDim.x/2; s>0;s>>=1){
+        for( s=blockDim.x/2; s>32;s>>=1){
             if(tid<s){
             nt[tid]+=nt[tid+s];
             }
         __syncthreads();
         }
+    if(tid<32){ warpReduce(nt,tid);}
 
         if(tid<32){
         out[blockIdx.x]+=nt[0];}
 
 
 }
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -199,41 +246,44 @@ int main(int argc, char *argv[])
 
     //mm_write_banner(stdout, matcode);
     //printf("nz=%d M=%d N=%d\n",nz,M,N);
-    
+
+    /*Arguments k number of consequtive columns processed by each block and kernel launching parameters threadsPerBlock Blocks*/
+    int k=atoi(argv[4]);
     int threadsPerBlock=atoi(argv[2]);
-    int Blocks=atoi(argv[3]);    
+    int Blocks=atoi(argv[3]);
+    /*Device data*/
     int* dI;
     int* dJ;
     int* col;
     int* out;
-    int* bitmap;
+    int* out2;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
-    CUDA_CALL(cudaMalloc(&out, nz*sizeof(int)));
-    CUDA_CALL(cudaMalloc(&bitmap, N* Blocks));
+    CUDA_CALL(cudaMalloc(&out, Blocks*sizeof(int)));
 
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
-
+  
     float time;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
-    //CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
 
-    Init<<</*ceil(N/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(N,col,out);
-    findCol_ptr<<</*ceil(nz/threadsPerBlock),*/ Blocks,threadsPerBlock>>>(dJ,nz,col);
-    //colLengths<<<ceil(N/threadsPerBlock), threadsPerBlock>>>(N,col);
+    CUDA_CALL(cudaMemset(col, -1, N* (sizeof(int))));
+    CUDA_CALL(cudaMemset(out, 0, Blocks* (sizeof(int))));
 
 
-    computeRow2<<</*ceil(N/Blocks), */Blocks,threadsPerBlock>>>(dI,dJ,nz,col,out,N,bitmap);
+    findCol_ptr<<<Blocks,threadsPerBlock>>>(dJ,nz,col);
+    
+
+    computeCol<<<Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N,k);
       
     
     thrust::device_ptr<int> outptr(out);
-    int tot = thrust::reduce(outptr, outptr + Blocks); 
+    int tot =thrust::reduce(outptr, outptr + Blocks); 
     
 
     cudaEventRecord(stop, 0);
@@ -248,15 +298,16 @@ int main(int argc, char *argv[])
 
 
     printf(" Trianles =  %d\n",tot );
+   
 
-
-
-
-    CUDA_CALL(cudaFree(bitmap));
     CUDA_CALL(cudaFree(out));
     CUDA_CALL(cudaFree(dI));
     CUDA_CALL(cudaFree(dJ));
     CUDA_CALL(cudaFree(col));
+
+
+
+
 
 
     return 0;

@@ -95,7 +95,6 @@ __device__ int ComputeIntersection(int* blockCol,int* col,int len,int nz,int* dI
                     r1=blockCol[k1];
 
                     }
-                    if(k2==nz){break;}
                     
                 }}
 
@@ -182,6 +181,11 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
             }
         s=s+ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
             out2[j+colStart]=ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
+
+            if(j+colStart==137 ||  j+colStart==972){
+                printf("out2[%d]=%d\n",j+colStart,out2[j+colStart] );
+            }  
+
      }
 
 
@@ -266,6 +270,16 @@ void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
     out[i]=s;
   }
 }}
+
+int reduce(int* out,int nz){
+ int s=0;
+    for(int i =0;i<nz;i++){
+        s=s+out[i];
+        //if(i<50){
+        //printf("out[%d]=%d\n",i,out[i]);}
+    }
+    return s;
+}
 
 
 
@@ -392,10 +406,14 @@ int main(int argc, char *argv[])
     int* out3=(int *)malloc(nz*sizeof(int));
     findColStart2(J,nz,col_ptr);
      compute(I,J,nz,col_ptr,out3,N);
+          printf("%d \n",reduce(elem,nz));
 
-     for(int i=0 ;i<1000;i++){
+     printf("Errors poy\n");
+     for(int i=4000 ;i<8000;i++){
+       // printf("saka\n");
         if(out3[i]!=elem[i]){
-            printf("i=%d  out3=%d elem=%d\n",i,out3[i],elem[i] );
+
+            printf("i=%d  out3=%d elem=%d COL[i]=%d\n",i,out3[i],elem[i],dJ[i] );
         }
      }
 
