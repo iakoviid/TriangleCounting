@@ -88,7 +88,25 @@ int reduce(int* out,int nz){
     return s;
 }
 
-
+int klength(int* col,int N,int k){
+    int maxlen=0;
+    int len;
+    for(int i=0;i<N/k+1;i++){
+        int a=0;
+        for(int j=0;j<k;j++){
+            if(k*i+k<N){
+        len=col[k*i+1+j]-col[k*i+j];
+    
+        if(col[i*k+j]>=0 && len>0){
+        a=a+len;
+            if(a>maxlen){
+                maxlen=a;
+            }
+        }}
+    }
+    }
+    return maxlen;
+}
 int main(int argc, char *argv[])
 {
     int ret_code;
@@ -157,15 +175,19 @@ int main(int argc, char *argv[])
     compute(I,J,nz,col,out,N);
     int s=reduce(out,nz);
     printf("%d\n",s );
+    int k=atoi(argv[2]);
 
     InitColStart(N,col);
     findColStart(J,nz,col);
+    int maxlen=klength(col,N,k);
+    printf("====================================================================\n");
+    printf("maxlen=%d\n",maxlen );
     //int* out2=(int*)malloc(N*sizeof(int));
     //computeRow(I,J,nz,col,out2,N);
     //int d=reduce(out2,N);
     //printf("%d\n",d );
     for(int i=0;i<50;i++){
-        printf("out[%d]=%d\n",i,out[i] );
+        //printf("out[%d]=%d\n",i,out[i] );
     }
     printf("dJ[%d]=%d\n",137,J[137] );
     //for(int i;i< 20;i++){printf("%d-",out2[i] );}

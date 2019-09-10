@@ -110,7 +110,7 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N,int k
     int s=0;
     int j;
     extern __shared__ int nt[];  
-    __shared__ int blockCol[sharedsize];
+    int* blockCol=&nt[blockDim.x];
     int tid=threadIdx.x;
     for(int i=blockIdx.x;i<N/k+1;i+=gridDim.x){
     /*Find the lengths of k consequtive columns */
@@ -129,7 +129,7 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N,int k
 	        }
 	        else{len= 0;}
 
-	        if(colStart>=0 && len!=0){
+	        if(colStart>=0 && len>0){
 	            if(tid<32){
 	            nt[j]=len;}
 	            a=a+len;
@@ -194,17 +194,16 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N,int k
 
 }
 
-int main(int argc, char *argv[])
-{
+void ReadMatrix(int* M,int* N,int* nz,int** I,int** J,int argc,char** argv){
+
+    int i;
     int ret_code;
         MM_typecode matcode;
         FILE *f;
-        int M, N, nz;   
-        int i, *I, *J;
-
-        if (argc < 3)
+        
+        if (argc < 4)
         {
-            fprintf(stderr, "Usage: %s [martix-market-filename] threadsPerBlock\n", argv[0]);
+            fprintf(stderr, "Usage: %s [martix-market-filename] [threadsPerBlock] [numberOfBlocks]\n", argv[0]);
             exit(1);
         }
         else    
@@ -229,26 +228,53 @@ int main(int argc, char *argv[])
 
         /* find out size of sparse matrix .... */
 
-        if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) !=0)
+        if ((ret_code = mm_read_mtx_crd_size(f, M, N, nz)) !=0)
             exit(1);
 
     /* reseve memory for matrices */
 
-    I = (int *) malloc(nz * sizeof(int));
-    J = (int *) malloc(nz * sizeof(int));
+    *I = (int *) malloc(*nz * sizeof(int));
+    *J = (int *) malloc(*nz * sizeof(int));
   
 
-    for (i=0; i<nz; i++)
+    for (i=0; i<*nz; i++)
     {
-        fscanf(f, "%d %d\n", &I[i], &J[i]);
-        I[i]--;  /* adjust from 1-based to 0-based */
-        J[i]--;
+        fscanf(f, "%d %d\n", &(*I)[i], &(*J)[i]);
+        (*I)[i]--;  /* adjust from 1-based to 0-based */
+        (*J)[i]--;
     }
 
     if (f !=stdin) fclose(f);
+}
 
+int klength(int* col,int N,int k){
+    int maxlen=0;
+    int len;
+    for(int i=0;i<N/k+1;i++){
+        int a=0;
+        for(int j=0;j<k;j++){
+            if(k*i+k<N){
+        len=col[k*i+1+j]-col[k*i+j];
+    
+        if(col[i*k+j]>=0 && len>0){
+        a=a+len;
+            if(a>maxlen){
+                maxlen=a;
+            }
+        }}
+    }
+    }
+    return maxlen;
+}
+int main(int argc, char *argv[])
+{
 
-    //mm_write_banner(stdout, matcode);
+    int M, N, nz;   
+    int *I, *J;
+
+    ReadMatrix(&M,&N,&nz,&I,&J,argc,argv);
+
+   //mm_write_banner(stdout, matcode);
     //printf("nz=%d M=%d N=%d\n",nz,M,N);
 
     /*Arguments k number of consequtive columns processed by each block and kernel launching parameters threadsPerBlock Blocks*/
@@ -260,7 +286,6 @@ int main(int argc, char *argv[])
     int* dJ;
     int* col;
     int* out;
-    int* out2;
     CUDA_CALL(cudaMalloc(&dI, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&dJ, nz*sizeof(int)));
     CUDA_CALL(cudaMalloc(&col, N*sizeof(int)));
@@ -269,7 +294,8 @@ int main(int argc, char *argv[])
 
     cudaMemcpy(dI, I, nz*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dJ, J, nz*sizeof(int), cudaMemcpyHostToDevice);
-  
+
+    int length=klength(col,N,k);
     float time;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -282,8 +308,7 @@ int main(int argc, char *argv[])
 
     findCol_ptr<<<Blocks,threadsPerBlock>>>(dJ,nz,col);
     
-
-    computeCol<<<Blocks,threadsPerBlock,threadsPerBlock*sizeof(int)>>>(dI,dJ,nz,col,out,N,k);
+    computeCol<<<Blocks,threadsPerBlock,(threadsPerBlock+length)*sizeof(int)>>>(dI,dJ,nz,col,out,N,k);
       
     
     thrust::device_ptr<int> outptr(out);

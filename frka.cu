@@ -112,8 +112,17 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
 
     int tid=threadIdx.x;
 
-    for(int i=blockIdx.x;i<N/k+1;i+=gridDim.x){
+    for(int i=blockIdx.x;i<N;i+=gridDim.x){
 
+        //if(k*i>409995){
+        //    if(tid==0 && blockIdx.x==0){
+        //    printf("kaka\n");
+        //}
+        //}
+        if(k*i<= 391238 && k*i+k-1>= 391238){
+            if(tid==0){
+            printf("Saka");}
+        }
         int a=0;
         int b=-1;
         int len;
@@ -128,7 +137,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
         }
         else{len= 0;}
 
-        if(colStart>=0 && len!=0){
+        if(colStart>=0 && len>0){
             if(tid==0){
             nt[j]=len;}
             //if(i==gridDim.x+1 && tid==0){printf("len=%d nt[%d]=%d\n",len,j,nt[j] );}
@@ -174,6 +183,7 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
             //printf("len =%d \n",len );
                 
             //}
+            
             b=0;
             for(int x=0;x<k;x++){
                 b=b+nt[x];
@@ -182,7 +192,11 @@ __global__ void computeRow2(int* dI,int* dJ,int nz,int* col,int* out, int N,int 
         s=s+ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
             out2[j+colStart]=ComputeIntersection(blockCol,col,/*nt[dJ[j+colStart]%k]*/b ,nz, dI, j);
 
-            if(j+colStart==137 ||  j+colStart==972){
+            if (k*i<= 391238 && k*i+k-1>= 391238){
+                if(tid==0){
+                printf(" NT =%d %d %d %d %d %d %d %d \n",nt[0],nt[1],nt[2],nt[3],nt[4],nt[5],nt[6],nt[7] );}
+            }
+            if (k*i<= 391238 && k*i+k-1>= 391238){
                 printf("out2[%d]=%d\n",j+colStart,out2[j+colStart] );
             }  
 
@@ -405,15 +419,16 @@ int main(int argc, char *argv[])
     int* col_ptr=(int *)malloc(N*sizeof(int));
     int* out3=(int *)malloc(nz*sizeof(int));
     findColStart2(J,nz,col_ptr);
-     compute(I,J,nz,col_ptr,out3,N);
-          printf("%d \n",reduce(elem,nz));
-
+    compute(I,J,nz,col_ptr,out3,N);
+    printf("%d \n",reduce(elem,nz));
      printf("Errors poy\n");
-     for(int i=4000 ;i<8000;i++){
-       // printf("saka\n");
-        if(out3[i]!=elem[i]){
 
-            printf("i=%d  out3=%d elem=%d COL[i]=%d\n",i,out3[i],elem[i],dJ[i] );
+     for(int i=3114318 ;i<nz;i++){
+         //printf("i=%d  out3=%d elem=%d COL[i]=%d\n",i,out3[i],elem[i],J[i] );
+        if(out3[i]!=elem[i]){
+       // printf("saka\n");
+
+           printf("i=%d  out3=%d elem=%d COL[i]=%d\n",i,out3[i],elem[i],J[i] );
         }
      }
 
