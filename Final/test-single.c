@@ -40,53 +40,7 @@ void findColStart(int *dJ, int nz, int *col) {
 
 
 
-void compute(int* dI,int* dJ,int nz,int* col,int* out,int N){
-  for(int i=0;i<nz;i++){  
-    if(i<nz){
-    int s=0;
-    int x=dI[i];
-    int y=dJ[i];
-    int k1=col[x];
-    int k2=col[y];
-    int r1;
-    int r2;
-    if(k1>0){
-    int len1=col[x+1];
-    int len2=col[y+1];
-    while(k1<len1 && k2<len2 ) {
-        if(k1>=nz || k2>=nz ){break;}
-        r1=dI[k1];
-        r2=dI[k2];
-        if(r1==r2){
-            s++;      
-            k1++;
-            k2++;
-        }else if(r1>r2){
-            k2++;
 
-        }else{
-            k1++;
-        }
-        
-
-    }
- }
-
-
-    out[i]=s;
-  }
-}}
-
-
-int reduce(int* out,int nz){
- int s=0;
-    for(int i =0;i<nz;i++){
-        s=s+out[i];
-        //if(i<50){
-        //printf("out[%d]=%d\n",i,out[i]);}
-    }
-    return s;
-}
 
 int klength(int* col,int N,int k){
     int maxlen=0;
@@ -172,9 +126,7 @@ int main(int argc, char *argv[])
     InitColStart(N,col);
     findColStart(J,nz,col);
     //colLengths(N,col);
-    compute(I,J,nz,col,out,N);
-    int s=reduce(out,nz);
-    printf("%d\n",s );
+   
     int k=atoi(argv[2]);
 
     InitColStart(N,col);
@@ -182,17 +134,6 @@ int main(int argc, char *argv[])
     int maxlen=klength(col,N,k);
     printf("====================================================================\n");
     printf("maxlen=%d\n",maxlen );
-    //int* out2=(int*)malloc(N*sizeof(int));
-    //computeRow(I,J,nz,col,out2,N);
-    //int d=reduce(out2,N);
-    //printf("%d\n",d );
-    for(int i=0;i<50;i++){
-        //printf("out[%d]=%d\n",i,out[i] );
-    }
-    printf("dJ[%d]=%d\n",137,J[137] );
-    //for(int i;i< 20;i++){printf("%d-",out2[i] );}
-
-
 
     return 0;
 }

@@ -110,7 +110,7 @@ __global__ void computeCol(int* dI,int* dJ,int nz,int* col,int* out, int N,int k
     int s=0;
     int j;
     extern __shared__ int nt[];  
-     int* blockCol=&nt[blockDim.x];
+     int* blockCol=&nt[k];
     int tid=threadIdx.x;
     for(int i=blockIdx.x;i<N/k+1;i+=gridDim.x){
     /*Find the lengths of k consequtive columns */
