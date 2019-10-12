@@ -27,7 +27,7 @@ shared [graphFile] [numberOfThreads] [numberOfBlocks] [numberOfColumns] [MaxNumb
 ./shared ./co.mtx 64 1024 1 1093
 
 
-## P.S. (MaxNumberOfElementsInacolumn)
+## P.S. (MaxNumberOfElementsIncolumns)
 Max Number Of Elements In a column is given and it's time is not counted
 because seeing the profiling it would be negligible and the implementation would be 
 trivial a check and a max reduction.
